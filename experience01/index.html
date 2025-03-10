@@ -1,0 +1,617 @@
+<!DOCTYPE html>
+<html lang="fr">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Simulation Visuelle de Nuée d'Oiseaux</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      background-color: #f0f0f0;
+      font-family: Arial, sans-serif;
+    }
+
+    h1 {
+      color: #333;
+      margin-bottom: 10px;
+    }
+
+    .controls {
+      margin-bottom: 20px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 15px;
+      justify-content: center;
+    }
+
+    .control-group {
+      display: flex;
+      flex-direction: column;
+      background-color: #fff;
+      padding: 10px;
+      border-radius: 8px;
+      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+      min-width: 200px;
+    }
+
+    .control-group h3 {
+      margin-top: 0;
+      margin-bottom: 10px;
+      font-size: 16px;
+      color: #555;
+    }
+
+    .slider-container {
+      display: flex;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+
+    .slider-container label {
+      flex: 1;
+      font-size: 14px;
+    }
+
+    .slider-container input {
+      flex: 1;
+    }
+
+    .slider-value {
+      width: 40px;
+      text-align: right;
+      font-size: 14px;
+    }
+
+    canvas {
+      border: 1px solid #ccc;
+      background-color: #fff;
+      box-shadow: 0 3px 10px rgba(0, 0, 0, 0.2);
+    }
+
+    .stats {
+      margin-top: 10px;
+      font-size: 14px;
+      color: #666;
+    }
+
+    button {
+      padding: 8px 15px;
+      border: none;
+      background-color: #4CAF50;
+      color: white;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+      margin: 5px;
+    }
+
+    button:hover {
+      background-color: #45a049;
+    }
+  </style>
+</head>
+
+<body>
+  <h1>Simulation de Nuée d'Oiseaux</h1>
+
+  <div class="controls">
+    <div class="control-group">
+      <h3>Paramètres de base</h3>
+      <div class="slider-container">
+        <label for="numBoids">Nombre d'oiseaux:</label>
+        <input type="range" id="numBoids" min="10" max="300" value="100">
+        <span id="numBoidsValue" class="slider-value">100</span>
+      </div>
+      <div class="slider-container">
+        <label for="maxSpeed">Vitesse max:</label>
+        <input type="range" id="maxSpeed" min="1" max="10" value="4" step="0.5">
+        <span id="maxSpeedValue" class="slider-value">4</span>
+      </div>
+      <div class="slider-container">
+        <label for="maxForce">Force max:</label>
+        <input type="range" id="maxForce" min="0.01" max="0.5" value="0.1" step="0.01">
+        <span id="maxForceValue" class="slider-value">0.1</span>
+      </div>
+    </div>
+
+    <div class="control-group">
+      <h3>Comportement</h3>
+      <div class="slider-container">
+        <label for="perceptionRadius">Rayon de perception:</label>
+        <input type="range" id="perceptionRadius" min="20" max="200" value="50">
+        <span id="perceptionRadiusValue" class="slider-value">50</span>
+      </div>
+      <div class="slider-container">
+        <label for="separationDist">Distance de séparation:</label>
+        <input type="range" id="separationDist" min="10" max="50" value="25">
+        <span id="separationDistValue" class="slider-value">25</span>
+      </div>
+    </div>
+
+    <div class="control-group">
+      <h3>Coefficients</h3>
+      <div class="slider-container">
+        <label for="separationWeight">Poids séparation:</label>
+        <input type="range" id="separationWeight" min="0" max="5" value="1.5" step="0.1">
+        <span id="separationWeightValue" class="slider-value">1.5</span>
+      </div>
+      <div class="slider-container">
+        <label for="alignmentWeight">Poids alignement:</label>
+        <input type="range" id="alignmentWeight" min="0" max="5" value="1.0" step="0.1">
+        <span id="alignmentWeightValue" class="slider-value">1.0</span>
+      </div>
+      <div class="slider-container">
+        <label for="cohesionWeight">Poids cohésion:</label>
+        <input type="range" id="cohesionWeight" min="0" max="5" value="1.0" step="0.1">
+        <span id="cohesionWeightValue" class="slider-value">1.0</span>
+      </div>
+    </div>
+  </div>
+
+  <div>
+    <button id="resetBtn">Réinitialiser</button>
+    <button id="pauseBtn">Pause</button>
+  </div>
+
+  <canvas id="boidCanvas" width="900" height="600"></canvas>
+
+  <div class="stats" id="stats">FPS: 0</div>
+
+  <script>
+    // Classe représentant un oiseau (boid)
+    class Boid {
+      constructor(x, y, vx, vy) {
+        // Position initiale (x, y)
+        this.position = { x: x, y: y }
+
+        // Vitesse initiale (vx, vy)
+        this.velocity = { x: vx, y: vy }
+
+        // Limites de l'espace de simulation
+        this.width = canvas.width
+        this.height = canvas.height
+
+        // Historique des positions pour la traînée
+        this.history = []
+        this.historyMax = 5
+      }
+
+      // Calculer la distance entre ce boid et un autre
+      distance(boid) {
+        const dx = this.position.x - boid.position.x
+        const dy = this.position.y - boid.position.y
+        return Math.sqrt(dx * dx + dy * dy)
+      }
+
+      // Normaliser un vecteur (le ramener à une longueur de 1)
+      normalize(vector) {
+        const length = Math.sqrt(vector.x * vector.x + vector.y * vector.y)
+        if (length === 0) return { x: 0, y: 0 }
+        return { x: vector.x / length, y: vector.y / length }
+      }
+
+      // Limiter la magnitude d'un vecteur
+      limit(vector, max) {
+        const length = Math.sqrt(vector.x * vector.x + vector.y * vector.y)
+        if (length > max) {
+          vector.x = (vector.x / length) * max
+          vector.y = (vector.y / length) * max
+        }
+        return vector
+      }
+
+      // Règle 1 : Séparation - éviter les autres boids trop proches
+      separation(boids, minDistance) {
+        // Force de séparation (initialement nulle)
+        const force = { x: 0, y: 0 }
+        // Compteur pour le nombre de boids trop proches
+        let count = 0
+
+        // Parcourir tous les autres boids
+        for (const other of boids) {
+          // Ne pas se comparer à soi-même
+          if (this === other) continue
+
+          // Calculer la distance avec l'autre boid
+          const d = this.distance(other)
+
+          // Si l'autre boid est trop proche
+          if (d < minDistance && d > 0) {
+            // Calculer le vecteur d'éloignement (pointing away)
+            let diff = {
+              x: this.position.x - other.position.x,
+              y: this.position.y - other.position.y
+            }
+
+            // Normaliser ce vecteur
+            diff = this.normalize(diff)
+
+            // Plus l'autre est proche, plus la force est grande (inverse de la distance)
+            diff.x /= d
+            diff.y /= d
+
+            // Accumuler cette force
+            force.x += diff.x
+            force.y += diff.y
+            count++
+          }
+        }
+
+        // S'il y a des boids trop proches, calculer la moyenne des forces
+        if (count > 0) {
+          force.x /= count
+          force.y /= count
+
+          // Normaliser la force finale pour avoir une magnitude unitaire
+          const normalized = this.normalize(force)
+          force.x = normalized.x
+          force.y = normalized.y
+        }
+
+        return force
+      }
+
+      // Règle 2 : Alignement - s'aligner avec la direction des boids voisins
+      alignment(boids, perceptionRadius) {
+        // Vecteur de vitesse moyenne de tous les voisins
+        const averageVelocity = { x: 0, y: 0 }
+        // Compteur pour le nombre de voisins
+        let count = 0
+
+        // Parcourir tous les autres boids
+        for (const other of boids) {
+          // Ne pas se comparer à soi-même
+          if (this === other) continue
+
+          // Si l'autre boid est dans le rayon de perception
+          if (this.distance(other) < perceptionRadius) {
+            // Ajouter sa vitesse à la somme
+            averageVelocity.x += other.velocity.x
+            averageVelocity.y += other.velocity.y
+            count++
+          }
+        }
+
+        // S'il y a des voisins, calculer la vitesse moyenne
+        if (count > 0) {
+          averageVelocity.x /= count
+          averageVelocity.y /= count
+
+          // Normaliser pour avoir une magnitude unitaire
+          const normalized = this.normalize(averageVelocity)
+          averageVelocity.x = normalized.x
+          averageVelocity.y = normalized.y
+        }
+
+        return averageVelocity
+      }
+
+      // Règle 3 : Cohésion - se diriger vers le centre de masse des boids voisins
+      cohesion(boids, perceptionRadius) {
+        // Position moyenne de tous les voisins (centre de masse)
+        const centerOfMass = { x: 0, y: 0 }
+        // Compteur pour le nombre de voisins
+        let count = 0
+
+        // Parcourir tous les autres boids
+        for (const other of boids) {
+          // Ne pas se comparer à soi-même
+          if (this === other) continue
+
+          // Si l'autre boid est dans le rayon de perception
+          if (this.distance(other) < perceptionRadius) {
+            // Ajouter sa position à la somme
+            centerOfMass.x += other.position.x
+            centerOfMass.y += other.position.y
+            count++
+          }
+        }
+
+        // S'il y a des voisins, calculer le centre de masse
+        if (count > 0) {
+          centerOfMass.x /= count
+          centerOfMass.y /= count
+
+          // Calculer le vecteur de direction vers le centre de masse
+          const direction = {
+            x: centerOfMass.x - this.position.x,
+            y: centerOfMass.y - this.position.y
+          }
+
+          // Normaliser ce vecteur
+          const normalized = this.normalize(direction)
+          return normalized
+        }
+
+        // Si aucun voisin, renvoyer une force nulle
+        return { x: 0, y: 0 }
+      }
+
+      // Fonction pour garder le boid dans l'espace de simulation (effet "bords rebondissants")
+      keepWithinBounds() {
+        const margin = 50
+        const force = { x: 0, y: 0 }
+        const turnFactor = 1
+
+        // Si trop près du bord gauche
+        if (this.position.x < margin) {
+          force.x = turnFactor // Force vers la droite
+        }
+        // Si trop près du bord droit
+        else if (this.position.x > this.width - margin) {
+          force.x = -turnFactor // Force vers la gauche
+        }
+
+        // Si trop près du bord supérieur
+        if (this.position.y < margin) {
+          force.y = turnFactor // Force vers le bas
+        }
+        // Si trop près du bord inférieur
+        else if (this.position.y > this.height - margin) {
+          force.y = -turnFactor // Force vers le haut
+        }
+
+        return force
+      }
+
+      // Mettre à jour la position et la vitesse du boid
+      update(boids, params) {
+        // Ajouter la position actuelle à l'historique
+        this.history.push({ ...this.position })
+        if (this.history.length > this.historyMax) {
+          this.history.shift()
+        }
+
+        // Calculer les forces pour les trois règles principales
+        let separation = this.separation(boids, params.separationDist)
+        let alignment = this.alignment(boids, params.perceptionRadius)
+        let cohesion = this.cohesion(boids, params.perceptionRadius)
+        let bounds = this.keepWithinBounds()
+
+        // Appliquer les coefficients
+        separation.x *= params.separationWeight
+        separation.y *= params.separationWeight
+
+        alignment.x *= params.alignmentWeight
+        alignment.y *= params.alignmentWeight
+
+        cohesion.x *= params.cohesionWeight
+        cohesion.y *= params.cohesionWeight
+
+        bounds.x *= 1.2 // Poids fixe pour la force de bord
+        bounds.y *= 1.2
+
+        // Combiner toutes les forces
+        const acceleration = {
+          x: separation.x + alignment.x + cohesion.x + bounds.x,
+          y: separation.y + alignment.y + cohesion.y + bounds.y
+        }
+
+        // Limiter l'accélération
+        this.limit(acceleration, params.maxForce)
+
+        // Appliquer l'accélération à la vitesse
+        this.velocity.x += acceleration.x
+        this.velocity.y += acceleration.y
+
+        // Limiter la vitesse
+        this.limit(this.velocity, params.maxSpeed)
+
+        // Mettre à jour la position
+        this.position.x += this.velocity.x
+        this.position.y += this.velocity.y
+
+        // Enroulement d'écran (si un boid sort complètement de l'écran, il réapparaît de l'autre côté)
+        if (this.position.x < 0) this.position.x = this.width
+        if (this.position.x > this.width) this.position.x = 0
+        if (this.position.y < 0) this.position.y = this.height
+        if (this.position.y > this.height) this.position.y = 0
+      }
+
+      // Dessiner le boid sur le canvas
+      draw(ctx) {
+        const angle = Math.atan2(this.velocity.y, this.velocity.x)
+
+        // Dessiner la traînée
+        ctx.strokeStyle = 'rgba(100, 150, 255, 0.2)'
+        ctx.lineWidth = 1
+        ctx.beginPath()
+
+        if (this.history.length > 0) {
+          ctx.moveTo(this.history[0].x, this.history[0].y)
+          for (let i = 1; i < this.history.length; i++) {
+            ctx.lineTo(this.history[i].x, this.history[i].y)
+          }
+          ctx.lineTo(this.position.x, this.position.y)
+        }
+
+        ctx.stroke()
+
+        // Sauvegarder le contexte actuel
+        ctx.save()
+
+        // Déplacer l'origine au centre du boid
+        ctx.translate(this.position.x, this.position.y)
+        // Faire pivoter le contexte dans la direction du mouvement
+        ctx.rotate(angle)
+
+        // Dessiner le corps du boid (un triangle)
+        const size = 6
+        ctx.fillStyle = '#1E90FF' // Bleu (couleur principale)
+        ctx.beginPath()
+        ctx.moveTo(size * 1.5, 0) // Pointe avant
+        ctx.lineTo(-size, -size) // Coin arrière gauche
+        ctx.lineTo(-size, size)  // Coin arrière droit
+        ctx.closePath()
+        ctx.fill()
+
+        // Restaurer le contexte
+        ctx.restore()
+      }
+    }
+
+    // Obtenir les éléments DOM
+    const canvas = document.getElementById('boidCanvas')
+    const ctx = canvas.getContext('2d')
+    const stats = document.getElementById('stats')
+    const pauseBtn = document.getElementById('pauseBtn')
+    const resetBtn = document.getElementById('resetBtn')
+
+    // Initialiser les contrôles des paramètres
+    const controls = {
+      numBoids: document.getElementById('numBoids'),
+      maxSpeed: document.getElementById('maxSpeed'),
+      maxForce: document.getElementById('maxForce'),
+      perceptionRadius: document.getElementById('perceptionRadius'),
+      separationDist: document.getElementById('separationDist'),
+      separationWeight: document.getElementById('separationWeight'),
+      alignmentWeight: document.getElementById('alignmentWeight'),
+      cohesionWeight: document.getElementById('cohesionWeight')
+    }
+
+    // Initialiser les affichages des valeurs
+    const valueDisplays = {
+      numBoidsValue: document.getElementById('numBoidsValue'),
+      maxSpeedValue: document.getElementById('maxSpeedValue'),
+      maxForceValue: document.getElementById('maxForceValue'),
+      perceptionRadiusValue: document.getElementById('perceptionRadiusValue'),
+      separationDistValue: document.getElementById('separationDistValue'),
+      separationWeightValue: document.getElementById('separationWeightValue'),
+      alignmentWeightValue: document.getElementById('alignmentWeightValue'),
+      cohesionWeightValue: document.getElementById('cohesionWeightValue')
+    }
+
+    // Mettre à jour les affichages des valeurs lors du changement des sliders
+    Object.keys(controls).forEach(key => {
+      const valueKey = key + 'Value'
+      if (controls[key] && valueDisplays[valueKey]) {
+        valueDisplays[valueKey].textContent = controls[key].value
+        controls[key].addEventListener('input', () => {
+          valueDisplays[valueKey].textContent = controls[key].value
+          if (key === 'numBoids') {
+            updateBoidCount()
+          }
+        })
+      }
+    })
+
+    // Variables globales
+    let boids = []
+    let paused = false
+    let animationFrameId
+    let lastFrameTime = 0
+    let frameCount = 0
+    let lastFpsUpdateTime = 0
+
+    // Initialiser la simulation
+    function init() {
+      // Vider le tableau des boids
+      boids = []
+
+      // Créer le nombre spécifié de boids avec des positions et vitesses aléatoires
+      const numBoids = parseInt(controls.numBoids.value)
+      for (let i = 0; i < numBoids; i++) {
+        // Position aléatoire sur le canvas
+        const x = Math.random() * canvas.width
+        const y = Math.random() * canvas.height
+
+        // Vitesse aléatoire entre -1 et 1
+        const vx = (Math.random() * 2) - 1
+        const vy = (Math.random() * 2) - 1
+
+        // Créer et ajouter le boid
+        boids.push(new Boid(x, y, vx, vy))
+      }
+    }
+
+    // Mettre à jour le nombre de boids sans réinitialiser complètement
+    function updateBoidCount() {
+      const targetCount = parseInt(controls.numBoids.value)
+      const currentCount = boids.length
+
+      if (targetCount > currentCount) {
+        // Ajouter des boids
+        for (let i = 0; i < targetCount - currentCount; i++) {
+          const x = Math.random() * canvas.width
+          const y = Math.random() * canvas.height
+          const vx = (Math.random() * 2) - 1
+          const vy = (Math.random() * 2) - 1
+          boids.push(new Boid(x, y, vx, vy))
+        }
+      } else if (targetCount < currentCount) {
+        // Supprimer des boids
+        boids = boids.slice(0, targetCount)
+      }
+    }
+
+    // Animer la simulation
+    function animate(timestamp) {
+      // Calculer le FPS
+      if (!lastFrameTime) {
+        lastFrameTime = timestamp
+        lastFpsUpdateTime = timestamp
+      }
+
+      const deltaTime = timestamp - lastFrameTime
+      lastFrameTime = timestamp
+
+      frameCount++
+      if (timestamp - lastFpsUpdateTime > 1000) {
+        const fps = Math.round((frameCount * 1000) / (timestamp - lastFpsUpdateTime))
+        stats.textContent = `FPS: ${fps} | Oiseaux: ${boids.length}`
+        frameCount = 0
+        lastFpsUpdateTime = timestamp
+      }
+
+      // Effacer le canvas
+      ctx.clearRect(0, 0, canvas.width, canvas.height)
+
+      // Récupérer les paramètres actuels
+      const params = {
+        maxSpeed: parseFloat(controls.maxSpeed.value),
+        maxForce: parseFloat(controls.maxForce.value),
+        perceptionRadius: parseFloat(controls.perceptionRadius.value),
+        separationDist: parseFloat(controls.separationDist.value),
+        separationWeight: parseFloat(controls.separationWeight.value),
+        alignmentWeight: parseFloat(controls.alignmentWeight.value),
+        cohesionWeight: parseFloat(controls.cohesionWeight.value)
+      }
+
+      // Mettre à jour et dessiner chaque boid
+      for (const boid of boids) {
+        if (!paused) {
+          boid.update(boids, params)
+        }
+        boid.draw(ctx)
+      }
+
+      // Continuer l'animation
+      animationFrameId = requestAnimationFrame(animate)
+    }
+
+    // Gérer les événements des boutons
+    pauseBtn.addEventListener('click', () => {
+      paused = !paused
+      pauseBtn.textContent = paused ? 'Reprendre' : 'Pause'
+    })
+
+    resetBtn.addEventListener('click', () => {
+      init()
+      if (paused) {
+        paused = false
+        pauseBtn.textContent = 'Pause'
+      }
+    })
+
+    // Démarrer la simulation
+    init()
+    animate();
+  </script>
+</body>
+
+</html>
